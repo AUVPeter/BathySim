@@ -12,7 +12,7 @@ class BathySim:
       access to 2d views and sensor readings
 
   '''
-  def __init__(self,feature_scale=300,depth_mid=100,depth_range=20,seed=None):
+  def __init__(self,feature_scale=300,depth_mid=100.,depth_range=20.,seed=None,range_accuracy=0.001,outlier_freq=0.):
     ''' Initialize grid and sensors
 
       Parameters
@@ -24,11 +24,17 @@ class BathySim:
       avg_depth : float
         mean depth of the generated bathymetry
 
-      stdev_depth : float
-        relative vertical standard deviation
+      depth_range : float
+        relative +/- range of the returned bathy
 
       seed : float, default None
         if not None, used for repeatability between instances
+        
+      range_accuracy : float
+          additive noise component of sample, stdev of noise is: range_accuracy x measured_range
+          
+      outlier_frequency : float, [0,1]
+          frequency of 'bad' beams, or outliers. 0 is never, 1 is always
     '''
     # grid params
     self._feature_scale = feature_scale
@@ -42,7 +48,8 @@ class BathySim:
     self._mb_num_beams = 120
     self._mb_swath_angle = 45
     self._mb_swath_factor = np.tan(np.radians(self._mb_swath_angle)/2.0)
-    self._mb_range_accuracy = 0.001
+    self._mb_range_accuracy = range_accuracy
+    self._mb_outlier_frequency = outlier_freq
 
 
   def _sample_grid(self, x,y):
@@ -55,22 +62,23 @@ class BathySim:
     return (depth * self._depth_range/.4) + self._depth_mid
 
 
-  def generate_grid_view(self, origin=(0,0), size=(500,500)):
+  def generate_grid_view(self, origin=(0,0), shape=(500,500)):
     ''' Returns a 2D grid view of a selected region of the bathymetery
 
     Parameters
     ----------
     origin : tuple
       x,y position of grid origin
-    size : tuple, (int,int)
-      width,height in meters
+    width : int
+      width in x-direction
+    height : int
+      height in y-direction
 
     Returns
     -------
     grid : 2d np array
     
     '''
-    shape = size
     grid = np.zeros(shape)
     for x,y in np.ndindex(shape):
       grid[x][y] = self._sample_grid(x+origin[0],y+origin[1])
@@ -78,7 +86,7 @@ class BathySim:
     return grid
 
 
-  def generate_moos_image(self, root_name, origin=(0,0), size=(500,500), geo_origin=(42.,170.)):
+  def generate_moos_image(self, root_name, origin=(0,0), shape=(500,500), geo_origin=(42.,170.)):
     ''' Generates an image of a selected region of the bathymetery
 
     Parameters
@@ -93,10 +101,9 @@ class BathySim:
       image center in geographic coordinates (lat, lon)
     
     '''
-    width, height = origin
-    grid = self.generate_grid_view(origin,size)
-    img_w = width / 100
-    img_h = height / 100
+    grid = self.generate_grid_view(origin, shape)
+    img_w = shape[0]/ 100
+    img_h = shape[1] / 100
     fig= plt.figure(frameon=False)
     fig.set_size_inches(img_w, img_h)
     ax = plt.Axes(fig, [0.,0.,1.,1.])
@@ -113,8 +120,8 @@ class BathySim:
     lat_south, lon_west = utm.to_latlon(easting + origin[0],
                                northing + origin[1],
                                zone_num, zone_let)
-    lat_north, lon_east = utm.to_latlon(easting + origin[0] + width,
-                               northing + origin[1] + height,
+    lat_north, lon_east = utm.to_latlon(easting + origin[0] + shape[0],
+                               northing + origin[1] + shape[1],
                                zone_num, zone_let)
 
     print(lat_north, lat_south, lon_east, lon_west)
@@ -194,11 +201,10 @@ class BathySim:
     line = np.zeros((len(beams),3))
     line[:,0] = beams
 
-    if not sensor:
-      #apply pose
-      line = rot.apply(line)
-      line[:,0] += x
-      line[:,1] += y
+    #apply pose
+    line = rot.apply(line)
+    line[:,0] += x
+    line[:,1] += y
 
     #collect samples
     error = self._mb_range_accuracy * nadir_alt
@@ -207,7 +213,10 @@ class BathySim:
 
     if not sensor:
       line[:,2] -= depth
-
+    else:
+      line[:,0] = beams
+      line[:,1] = [0] * self._mb_num_beams
+    
     return line
 
 
@@ -216,5 +225,4 @@ if __name__ == '__main__':
   #print(bty.mb_sample(x=0,y=0,hdg=0, sensor=False))
   #print(bty.mb_sample(x=0,y=0,hdg=0, sensor=True))
 
-  bty.generate_moos_image('test_origin')
-  bty.generate_moos_image('test_shift',origin=(200,-400))
+  bty.generate_moos_image('test')
