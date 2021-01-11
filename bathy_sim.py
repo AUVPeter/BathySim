@@ -50,6 +50,8 @@ class BathySim:
     self._mb_swath_factor = np.tan(np.radians(self._mb_swath_angle)/2.0)
     self._mb_range_accuracy = range_accuracy
     self._mb_outlier_frequency = outlier_freq
+    self._mb_min_range = 0.0
+    self._mb_max_range = 150.0
 
 
   def _sample_grid(self, x,y):
@@ -59,7 +61,8 @@ class BathySim:
                 octaves=10, persistence=0.3,lacunarity=2.0)
 
     # shift depths to depth_mid +/- depth_range 
-    return (depth * self._depth_range/.4) + self._depth_mid
+    z = (depth * self._depth_range/.4) + self._depth_mid
+    return min(max(z,self._mb_min_range),self._mb_max_range)
 
 
   def generate_grid_view(self, origin=(0,0), shape=(500,500)):
@@ -207,9 +210,14 @@ class BathySim:
     line[:,1] += y
 
     #collect samples
-    error = self._mb_range_accuracy * nadir_alt
+    #error = self._mb_range_accuracy * nadir_alt
     for i,(x,y) in enumerate(zip(line[:,0],line[:,1])):
-      line[i,2] = self._sample_grid(x,y) + np.random.randn()*error
+      if np.random.rand() > self._mb_outlier_frequency:
+        line[i,2] = self._sample_grid(x,y) + (np.random.randn()*self._mb_range_accuracy*((x**2 + nadir_alt**2)**.5))
+      elif np.random.rand() > 0.5:
+        line[i,2] = self._mb_min_range
+      else:
+        line[i,2] = self._mb_max_range
 
     if not sensor:
       line[:,2] -= depth
