@@ -84,7 +84,7 @@ class iBathy:
         z_array = ",".join([f'{d:.2f}' for d in line[:,2]])
         self._moos.notify('BATHY_X', f"t={t:.2f},n={num},x={x_array}")
         self._moos.notify('BATHY_Y', f"t={t:.2f},n={num},y={y_array}")
-        self._moos.notify('BATHY_X', f"t={t:.2f},n={num},z={z_array}")
+        self._moos.notify('BATHY_Z', f"t={t:.2f},n={num},z={z_array}")
 
         self._logfile.write(f"iBATHY,{t:.2f},{num}\n")
         self._logfile.write(f"{x_array}\n{y_array}\n{z_array}\n")
