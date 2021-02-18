@@ -89,6 +89,30 @@ class BathySim:
     return grid
 
 
+  def generate_ascii_grid(self, root_name, origin=(0,0), shape=(500,500)):
+    ''' Generates an xyz asci file of selected region of the bathymetery
+
+    Parameters
+    ----------
+    root_name : string
+      generated file will be root_name.xyz
+    origin : tuple, (float,float)
+      x,y position of image bottom left corner in relation to bathymetry origin
+    size : tuple, (int,int)
+      width,height in meters
+    '''
+    try:
+      out_file = open(root_name + '.xyz', 'w')
+    except:
+      print("Could not open " + root_name)
+      return
+
+    for x,y in np.ndindex(shape):
+      z = self._sample_grid(x+origin[0],y+origin[1])
+      out_file.write(f"{x},{y},{z:.3f}\n")
+    out_file.close()
+
+
   def generate_moos_image(self, root_name, origin=(0,0), shape=(500,500), geo_origin=(42.,170.)):
     ''' Generates an image of a selected region of the bathymetery
 
@@ -229,8 +253,19 @@ class BathySim:
 
 
 if __name__ == '__main__':
-  bty = BathySim(seed=123)
+  import sys
+
+  if len(sys.argv) != 4:
+    print("Usage" + sys.argv[0] + " seed width height")
+    quit()
+
+  s = float(sys.argv[1])
+  w = int(sys.argv[2])
+  h = int(sys.argv[3])
+
+  bty = BathySim(seed=s)
   #print(bty.mb_sample(x=0,y=0,hdg=0, sensor=False))
   #print(bty.mb_sample(x=0,y=0,hdg=0, sensor=True))
 
-  bty.generate_moos_image('test')
+  bty.generate_moos_image('test',shape=(w,h))
+  bty.generate_ascii_grid('test',shape=(w,h))
