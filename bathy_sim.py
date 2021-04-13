@@ -237,7 +237,10 @@ class BathySim:
     #error = self._mb_range_accuracy * nadir_alt
     for i,(x,y) in enumerate(zip(line[:,0],line[:,1])):
       if np.random.rand() > self._mb_outlier_frequency:
-        line[i,2] = self._sample_grid(x,y) + (np.random.randn()*self._mb_range_accuracy*((x**2 + nadir_alt**2)**.5)) - depth
+        z = self._sample_grid(x,y) + (np.random.randn()*self._mb_range_accuracy*((x**2 + nadir_alt**2)**.5)) - depth
+        if (z**2. + beams[i]**2.)**.5 > self._mb_max_range:
+          z = 0.0
+        line[i,2] = z
       elif np.random.rand() > 0.5:
         line[i,2] = self._mb_min_range
       else:
