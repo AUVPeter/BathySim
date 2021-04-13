@@ -178,7 +178,7 @@ class BathySim:
       depth value at location 
     '''
     
-    d = self._sample_grid(x,y) ( 1 + self._mb_range_accuracy * np.random.randn())
+    d = self._sample_grid(x,y) * ( 1 + self._mb_range_accuracy * np.random.randn())
     if not sensor:
       d -= depth
     return d
@@ -210,7 +210,7 @@ class BathySim:
     rot = R.from_euler('z',[-hdg],degrees=True)
 
     # determine swath width at nadir and port/stbd extents
-    nadir_alt = self._sample_grid(x,y)
+    nadir_alt = self._sample_grid(x,y) - depth
     swath_width = self._mb_swath_factor * nadir_alt
 
     pre_sample = np.zeros((2,3))
@@ -219,8 +219,8 @@ class BathySim:
     pre_sample[:,0] += x
     pre_sample[:,1] += y
 
-    port_alt = self._sample_grid(pre_sample[0,0],pre_sample[0,1])
-    stbd_alt = self._sample_grid(pre_sample[1,0],pre_sample[1,1])
+    port_alt = self._sample_grid(pre_sample[0,0],pre_sample[0,1]) - depth
+    stbd_alt = self._sample_grid(pre_sample[1,0],pre_sample[1,1]) - depth
     sw_p = self._mb_swath_factor * port_alt
     sw_s = self._mb_swath_factor * stbd_alt
     beams = np.linspace(-sw_p, sw_s, self._mb_num_beams)
@@ -237,20 +237,28 @@ class BathySim:
     #error = self._mb_range_accuracy * nadir_alt
     for i,(x,y) in enumerate(zip(line[:,0],line[:,1])):
       if np.random.rand() > self._mb_outlier_frequency:
-        line[i,2] = self._sample_grid(x,y) + (np.random.randn()*self._mb_range_accuracy*((x**2 + nadir_alt**2)**.5))
+        line[i,2] = self._sample_grid(x,y) + (np.random.randn()*self._mb_range_accuracy*((x**2 + nadir_alt**2)**.5)) - depth
       elif np.random.rand() > 0.5:
         line[i,2] = self._mb_min_range
       else:
         line[i,2] = self._mb_max_range
 
     if not sensor:
-      line[:,2] -= depth
+      line[:,2] += depth
     else:
       line[:,0] = beams
       line[:,1] = [0] * self._mb_num_beams
     
     return line
 
+
+  def mb_nav_sample(self, x,y,hdg, depth, x_err = 0.0, y_err = 0.0, hdg_err = 0.0, depth_err = 0.0): 
+    line_true = self.mb_sample(x,y,hdg,depth,sensor=False)
+    rot = R.from_euler('z',[-hdg_err],degrees=True)
+    line_rot = rot.apply(line_true)
+    line_err = line_rot + [x_err, y_err, depth_err]
+    return line_err
+    
 
 if __name__ == '__main__':
   import sys
